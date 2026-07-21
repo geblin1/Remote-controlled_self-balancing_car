@@ -18,7 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f1xx_hal_tim.h"
+#include "stm32f103xb.h"
+#include "stm32f1xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -34,6 +35,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include "MPU6050.h"
+#include "Motor.h"
+#include "PID.h"
+#include "Encoder.h"
+#include "Serial.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,17 +59,11 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t KeyNum = 0;
-uint8_t Num = 0;
-
-int16_t AX, AY, AZ, GX, GY, GZ;
-uint16_t Count = 0;
-
-uint8_t a = 123;
-float x, y3, y2;
+// uint8_t RxFlag = 0;
+/*串口数据接收缓冲变量*/
 uint8_t RxData;
-uint8_t RxFlag = 0;
 char Rx_buffer[100];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,59 +108,26 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_TIM1_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
+  MX_TIM4_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   MPU6050_Init();
   HAL_TIM_Base_Start_IT(&htim1);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
+  HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);
   OLED_Init(); 
   // HAL_UART_Receive_IT(&huart1, &RxData, 1);
+  HAL_UART_Receive_IT(&huart2, &RxData, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    
-    OLED_Printf(0, 0, OLED_8X16, "%+06d", AX);
-    OLED_Printf(0, 16, OLED_8X16, "%+06d", AY);
-    OLED_Printf(0, 32, OLED_8X16, "%+06d", AZ);
-    OLED_Printf(64, 0, OLED_8X16, "%+06d", GX);
-    OLED_Printf(64, 16, OLED_8X16, "%+06d", GY);
-    OLED_Printf(64, 32, OLED_8X16, "%+06d", GZ);
-    OLED_Printf(0, 48, OLED_8X16, "C:%4d", Count);
-    OLED_Update();
-    // if(RxFlag == 1){
-    //   char *Tag = strtok(Rx_buffer, ",");
-    //   if(strcmp(Tag, "key") == 0){
-    //     char *Name = strtok(NULL, ",");
-    //     char *Action = strtok(NULL, ",");
-    //     if(strcmp(Name, "1") == 0 && strcmp(Action, "up") == 0){
-    //       printf("key,1,up\r\n");
-    //     }
-    //     else if(strcmp(Name, "2") == 0 && strcmp(Action, "down") == 0){
-    //       printf("key,2,down\r\n");
-    //     }
-    //   }
-    //   else if(strcmp(Tag, "slider") == 0){
-    //     char *Name = strtok(NULL, ",");
-    //     char *Value = strtok(NULL, ",");
-    //     if(strcmp(Name, "1") == 0){
-    //       uint8_t IntValue = atoi(Value);
-    //       printf("slider,1,%d\r\n", IntValue);
-    //     }
-    //     else if(strcmp(Name, "2") == 0){
-    //       float FloatValue = atof(Value);
-    //       printf("slider,2,%f\r\n", FloatValue);
-    //     }
-    //   }
-    //   else if(strcmp(Tag, "joystick") == 0){
-    //     int8_t LH = atoi(strtok(NULL, ","));
-    //     int8_t LV = atoi(strtok(NULL, ","));
-    //     int8_t RH = atoi(strtok(NULL, ","));
-    //     int8_t RV = atoi(strtok(NULL, ","));
-    //     printf("joystick,%d,%d,%d,%d\r\n", LH, LV, RH, RV);
-    //   }
-    //   RxFlag = 0;
-    // }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -227,8 +193,31 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
   static uint8_t RxState = 0;
   static uint8_t pRxPacket = 0;
   if(huart->Instance == USART1){
+    // /*识别数据包格式*/
+    // if(RxState == 0){
+    //   if(RxData == '[' /*&& RxFlag == 0*/){
+    //     RxState = 1;
+    //     pRxPacket = 0;
+    //   }
+    // }
+    // else if(RxState == 1){
+    //   if(RxData == ']'){
+    //     RxState = 0;
+    //     Rx_buffer[pRxPacket] = '\0';
+    //     // RxFlag = 1;
+    //   }
+    //   else{
+    //     Rx_buffer[pRxPacket] = RxData;
+    //     pRxPacket++;
+    //   }
+    // }
+    
+    // HAL_UART_Receive_IT(&huart1, &RxData, 1);
+  }
+  else if(huart->Instance == USART2){
+    /*识别数据包格式*/
     if(RxState == 0){
-      if(RxData == '[' && RxFlag == 0){
+      if(RxData == '[' /*&& RxFlag == 0*/){
         RxState = 1;
         pRxPacket = 0;
       }
@@ -237,22 +226,20 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
       if(RxData == ']'){
         RxState = 0;
         Rx_buffer[pRxPacket] = '\0';
-        RxFlag = 1;
+        // RxFlag = 1;
       }
       else{
         Rx_buffer[pRxPacket] = RxData;
         pRxPacket++;
       }
     }
-    HAL_UART_Receive_IT(&huart1, &RxData, 1);
+    HAL_UART_Receive_IT(&huart2, &RxData, 1);
   }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   if(htim->Instance == TIM1){
-    MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ); 
     Key_Tick();
-    Count = __HAL_TIM_GET_COUNTER(&htim1);
   }
 }
 /* USER CODE END 4 */
