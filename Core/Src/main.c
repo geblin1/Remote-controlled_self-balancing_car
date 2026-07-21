@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f103xb.h"
+#include "stm32f1xx_hal_tim.h"
 #include "stm32f1xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
@@ -59,6 +60,16 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+int16_t AX, AY, AZ, GX, GY, GZ;
+uint16_t TimerCount;
+/*加速度计测得的俯仰角*/
+float AngleAcc;
+/*角速度计测得的俯仰角*/
+float AngleGyro;
+/*滤波后得到的俯仰角*/
+float Angle;
+
 // uint8_t RxFlag = 0;
 /*串口数据接收缓冲变量*/
 uint8_t RxData;
@@ -128,6 +139,19 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    /*OLED显示*/
+		OLED_Printf(0, 0, OLED_8X16, "%+06d", AX);		//显示AX
+		OLED_Printf(0, 16, OLED_8X16, "%+06d", AY);		//显示AY
+		OLED_Printf(0, 32, OLED_8X16, "%+06d", AZ);		//显示AZ
+		OLED_Printf(64, 0, OLED_8X16, "%+06d", GX);		//显示GX
+		OLED_Printf(64, 16, OLED_8X16, "%+06d", GY);	//显示GY
+		OLED_Printf(64, 32, OLED_8X16, "%+06d", GZ);	//显示GZ
+		OLED_Printf(64, 48, OLED_8X16, "C:%05d", TimerCount);		//显示TimerCount
+		
+		/*OLED更新*/
+		OLED_Update();
+
+    Serial2_Printf("[plot,%f,%f,%f]\r\n", AngleAcc, AngleGyro, Angle);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -240,6 +264,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   if(htim->Instance == TIM1){
     Key_Tick();
+    TimerCount = 0;
+    MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
+    AngleAcc = -atan2(AX, AZ) / 3.14159 * 180;
+    AngleGyro = Angle + (GY - 70) / 32768.0 * 2000 * 0.001;   //70为角速度计的大致零漂值
+    float Alpha = 0.001;
+    Angle = Alpha * AngleAcc + (1 - Alpha) * AngleGyro;       //使用互补滤波进一步减小零漂影响
+    TimerCount = __HAL_TIM_GET_COUNTER(&htim1);
   }
 }
 /* USER CODE END 4 */
