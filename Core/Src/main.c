@@ -94,6 +94,14 @@ PID_t SpeedPID = {
   .OutMin = -20,
   .ErrorMax = 100,
 };
+PID_t TurnPID = {
+  .Kp = 2,
+  .Ki = 4,
+  .Kd = 0,
+  .OutMax = 50,
+  .OutMin = -50,
+  .ErrorMax = 100,
+};
 
 uint8_t RxFlag = 0;
 /*串口数据接收缓冲变量*/
@@ -175,6 +183,7 @@ int main(void)
       if(RunFlag == 0){
         PID_Init(&AnglePID);
         PID_Init(&SpeedPID);
+        PID_Init(&TurnPID);
         RunFlag = 1;
       }
       else if(RunFlag == 1){
@@ -198,6 +207,14 @@ int main(void)
     OLED_Printf(50, 32, OLED_6X8, "%+05.1f", SpeedPID.Target);
     OLED_Printf(50, 40, OLED_6X8, "%+05.1f", AveSpeed);
     OLED_Printf(50, 48, OLED_6X8, "%+05.0f", SpeedPID.Out);
+
+    OLED_Printf(88, 0, OLED_6X8, "Turn");
+    OLED_Printf(88, 8, OLED_6X8, "%05.2f", TurnPID.Kp);
+    OLED_Printf(88, 16, OLED_6X8, "%05.2f", TurnPID.Ki);
+    OLED_Printf(88, 24, OLED_6X8, "%05.2f", TurnPID.Kd);
+    OLED_Printf(88, 32, OLED_6X8, "%+05.1f", TurnPID.Target);
+    OLED_Printf(88, 40, OLED_6X8, "%+05.1f", DifSpeed);
+    OLED_Printf(88, 48, OLED_6X8, "%+05.0f", TurnPID.Out);
 		/*OLED更新*/
 		OLED_Update();
 
@@ -222,15 +239,25 @@ int main(void)
         //   AnglePID.Kd = atof(Value);
         // }
 
-        if(strcmp(Name, "SpeedKp") == 0){
-          SpeedPID.Kp = atof(Value);
-        }
-        else if(strcmp(Name, "SpeedKi") == 0){
-          SpeedPID.Ki = atof(Value);
-        }
-        else if(strcmp(Name, "SpeedKd") == 0){
-          SpeedPID.Kd = atof(Value);
-        }
+        // else if(strcmp(Name, "SpeedKp") == 0){
+        //   SpeedPID.Kp = atof(Value);
+        // }
+        // else if(strcmp(Name, "SpeedKi") == 0){
+        //   SpeedPID.Ki = atof(Value);
+        // }
+        // else if(strcmp(Name, "SpeedKd") == 0){
+        //   SpeedPID.Kd = atof(Value);
+        // }
+
+        // else if(strcmp(Name, "TurnKp") == 0){
+        //   TurnPID.Kp = atof(Value);
+        // }
+        // else if(strcmp(Name, "TurnKi") == 0){
+        //   TurnPID.Ki = atof(Value);
+        // }
+        // else if(strcmp(Name, "TurnKd") == 0){
+        //   TurnPID.Kd = atof(Value);
+        // }
       }
       else if(strcmp(Tag, "joystick") == 0){
         int8_t LH = atoi(strtok(NULL, ","));
@@ -238,13 +265,13 @@ int main(void)
         int8_t RH = atoi(strtok(NULL, ","));
         int8_t RV = atoi(strtok(NULL, ","));
         
-        SpeedPID.Target = LV / 15.0;
-        DifPWM = RH / 2;
+        SpeedPID.Target = LV / 25.0;
+        TurnPID.Target = RH / 25.0;
       }
       RxFlag = 0;
     }
 
-    Serial2_Printf("[plot,%f,%f]\r\n", SpeedPID.Target, AveSpeed);
+    Serial2_Printf("[plot,%f,%f]\r\n", TurnPID.Target, DifSpeed);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -405,6 +432,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
         SpeedPID.Actual = AveSpeed;
         PID_Update(&SpeedPID);
         AnglePID.Target = SpeedPID.Out;
+
+        TurnPID.Actual = DifSpeed;
+        PID_Update(&TurnPID);
+        DifPWM = TurnPID.Out;
       }
     }
 
