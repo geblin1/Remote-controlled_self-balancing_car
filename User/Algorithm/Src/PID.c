@@ -6,6 +6,14 @@
  */
 #include "PID.h"
 
+void PID_Init(PID_t *p){
+    p->Target = 0;
+    p->Actual = 0;
+    p->Error0 = 0;
+    p->Error1 = 0;
+    p->ErrorInt = 0;
+}
+
 void PID_Update(PID_t *pid_handle){
     pid_handle->Error1 = pid_handle->Error0;
     pid_handle->Error0 = pid_handle->Target - pid_handle->Actual;

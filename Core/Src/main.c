@@ -70,7 +70,21 @@ float AngleGyro;
 /*滤波后得到的俯仰角*/
 float Angle;
 
-// uint8_t RxFlag = 0;
+uint8_t KeyNum, RunFlag;
+
+int16_t LeftPWM, RightPWM;
+int16_t AvePWM, DifPWM;
+
+PID_t AnglePID = {
+  .Kp = 4,
+  .Ki = 0.2,
+  .Kd = 6,
+  .OutMax = 100,
+  .OutMin = -100,
+  .ErrorMax = 100,
+};
+
+uint8_t RxFlag = 0;
 /*串口数据接收缓冲变量*/
 uint8_t RxData;
 char Rx_buffer[100];
@@ -139,19 +153,68 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    if(RunFlag){
+      LED_ON();
+    }
+    else{
+      LED_OFF();
+    }
+    KeyNum = Key_GetNum();
+    if(KeyNum == 1){
+      if(RunFlag == 0){
+        PID_Init(&AnglePID);
+        RunFlag = 1;
+      }
+      else if(RunFlag == 1){
+        RunFlag = 0;
+      }
+    }
     /*OLED显示*/
-		OLED_Printf(0, 0, OLED_8X16, "%+06d", AX);		//显示AX
-		OLED_Printf(0, 16, OLED_8X16, "%+06d", AY);		//显示AY
-		OLED_Printf(0, 32, OLED_8X16, "%+06d", AZ);		//显示AZ
-		OLED_Printf(64, 0, OLED_8X16, "%+06d", GX);		//显示GX
-		OLED_Printf(64, 16, OLED_8X16, "%+06d", GY);	//显示GY
-		OLED_Printf(64, 32, OLED_8X16, "%+06d", GZ);	//显示GZ
-		OLED_Printf(64, 48, OLED_8X16, "C:%05d", TimerCount);		//显示TimerCount
-		
+    OLED_Clear();
+		OLED_Printf(0, 0, OLED_6X8, "  Angle");
+    OLED_Printf(0, 8, OLED_6X8, "P:%05.2f", AnglePID.Kp);
+    OLED_Printf(0, 16, OLED_6X8, "I:%05.2f", AnglePID.Ki);
+    OLED_Printf(0, 24, OLED_6X8, "D:%05.2f", AnglePID.Kd);
+    OLED_Printf(0, 32, OLED_6X8, "T:%+05.1f", AnglePID.Target);
+    OLED_Printf(0, 40, OLED_6X8, "A:%+05.1f", Angle);
+    OLED_Printf(0, 48, OLED_6X8, "O:%+05.0f", AnglePID.Out);
 		/*OLED更新*/
 		OLED_Update();
 
-    Serial2_Printf("[plot,%f,%f,%f]\r\n", AngleAcc, AngleGyro, Angle);
+    if(RxFlag == 1){
+      char *Tag = strtok(Rx_buffer, ",");
+      if(strcmp(Tag, "key") == 0){
+        char *Name = strtok(NULL, ",");
+        char *Action = strtok(NULL, ",");
+        
+      }
+      else if(strcmp(Tag, "slider") == 0){
+        char *Name = strtok(NULL, ",");
+        char *Value = strtok(NULL, ",");
+
+        if(strcmp(Name, "AngleKp") == 0){
+          AnglePID.Kp = atof(Value);
+        }
+        else if(strcmp(Name, "AngleKi") == 0){
+          AnglePID.Ki = atof(Value);
+        }
+        else if(strcmp(Name, "AngleKd") == 0){
+          AnglePID.Kd = atof(Value);
+        }
+      }
+      else if(strcmp(Tag, "joystick") == 0){
+        int8_t LH = atoi(strtok(NULL, ","));
+        int8_t LV = atoi(strtok(NULL, ","));
+        int8_t RH = atoi(strtok(NULL, ","));
+        int8_t RV = atoi(strtok(NULL, ","));
+        
+        AnglePID.Target = LV / 10;
+        DifPWM = RH / 2;
+      }
+      RxFlag = 0;
+    }
+
+    Serial2_Printf("[plot,%f,%f]\r\n", AnglePID.Target, Angle);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -241,7 +304,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
   else if(huart->Instance == USART2){
     /*识别数据包格式*/
     if(RxState == 0){
-      if(RxData == '[' /*&& RxFlag == 0*/){
+      if(RxData == '[' && RxFlag == 0){
         RxState = 1;
         pRxPacket = 0;
       }
@@ -250,7 +313,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
       if(RxData == ']'){
         RxState = 0;
         Rx_buffer[pRxPacket] = '\0';
-        // RxFlag = 1;
+        RxFlag = 1;
       }
       else{
         Rx_buffer[pRxPacket] = RxData;
@@ -262,14 +325,46 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+  static uint16_t Count0;
   if(htim->Instance == TIM1){
     Key_Tick();
+
     TimerCount = 0;
-    MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
-    AngleAcc = -atan2(AX, AZ) / 3.14159 * 180;
-    AngleGyro = Angle + (GY - 70) / 32768.0 * 2000 * 0.001;   //70为角速度计的大致零漂值
-    float Alpha = 0.001;
-    Angle = Alpha * AngleAcc + (1 - Alpha) * AngleGyro;       //使用互补滤波进一步减小零漂影响
+
+    Count0++;
+    if(Count0 >= 10){
+      Count0 = 0;
+      MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
+      /*俯仰角姿态解算*/
+      AngleAcc = -atan2(AX, AZ) / 3.14159 * 180;
+      AngleGyro = Angle + (GY - 70) / 32768.0 * 2000 * 0.01;   //70为角速度计的大致零漂值
+      float Alpha = 0.01;
+      Angle = Alpha * AngleAcc + (1 - Alpha) * AngleGyro;       //使用互补滤波进一步减小零漂影响
+  
+      if(Angle > 50 || Angle < -50){
+        RunFlag = 0;
+      }
+      if(RunFlag){
+        AnglePID.Actual = Angle;
+        // AnglePID.Target = 0;
+        PID_Update(&AnglePID);
+        AvePWM = -AnglePID.Out;
+
+        LeftPWM = AvePWM + DifPWM / 2;
+        RightPWM = AvePWM - DifPWM / 2;
+
+        if(LeftPWM > 100){LeftPWM = 100;} else if(LeftPWM < -100){LeftPWM = -100;}
+        if(RightPWM > 100){RightPWM = 100;} else if(RightPWM < -100){RightPWM = -100;}
+
+        Motor_SetPWM(1, LeftPWM);
+        Motor_SetPWM(2, RightPWM);
+      }
+      else{
+        Motor_SetPWM(1, 0);
+        Motor_SetPWM(2, 0);
+      }
+    }
+
     TimerCount = __HAL_TIM_GET_COUNTER(&htim1);
   }
 }

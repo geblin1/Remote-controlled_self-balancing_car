@@ -27,6 +27,7 @@ typedef struct {
     float ErrorMax;
 } PID_t;
 
+void PID_Init(PID_t *p);
 void PID_Update(PID_t *pid_handle);
 
 #endif
