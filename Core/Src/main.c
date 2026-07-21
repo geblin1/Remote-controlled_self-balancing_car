@@ -75,12 +75,23 @@ uint8_t KeyNum, RunFlag;
 int16_t LeftPWM, RightPWM;
 int16_t AvePWM, DifPWM;
 
+float LeftSpeed, RightSpeed;
+float AveSpeed, DifSpeed;
+
 PID_t AnglePID = {
   .Kp = 4,
   .Ki = 0.2,
   .Kd = 6,
   .OutMax = 100,
   .OutMin = -100,
+  .ErrorMax = 100,
+};
+PID_t SpeedPID = {
+  .Kp = 2.5,
+  .Ki = 0,
+  .Kd = 0,
+  .OutMax = 20,
+  .OutMin = -20,
   .ErrorMax = 100,
 };
 
@@ -163,6 +174,7 @@ int main(void)
     if(KeyNum == 1){
       if(RunFlag == 0){
         PID_Init(&AnglePID);
+        PID_Init(&SpeedPID);
         RunFlag = 1;
       }
       else if(RunFlag == 1){
@@ -178,6 +190,14 @@ int main(void)
     OLED_Printf(0, 32, OLED_6X8, "T:%+05.1f", AnglePID.Target);
     OLED_Printf(0, 40, OLED_6X8, "A:%+05.1f", Angle);
     OLED_Printf(0, 48, OLED_6X8, "O:%+05.0f", AnglePID.Out);
+
+    OLED_Printf(50, 0, OLED_6X8, "Speed");
+    OLED_Printf(50, 8, OLED_6X8, "%05.2f", SpeedPID.Kp);
+    OLED_Printf(50, 16, OLED_6X8, "%05.2f", SpeedPID.Ki);
+    OLED_Printf(50, 24, OLED_6X8, "%05.2f", SpeedPID.Kd);
+    OLED_Printf(50, 32, OLED_6X8, "%+05.1f", SpeedPID.Target);
+    OLED_Printf(50, 40, OLED_6X8, "%+05.1f", AveSpeed);
+    OLED_Printf(50, 48, OLED_6X8, "%+05.0f", SpeedPID.Out);
 		/*OLED更新*/
 		OLED_Update();
 
@@ -192,14 +212,24 @@ int main(void)
         char *Name = strtok(NULL, ",");
         char *Value = strtok(NULL, ",");
 
-        if(strcmp(Name, "AngleKp") == 0){
-          AnglePID.Kp = atof(Value);
+        // if(strcmp(Name, "AngleKp") == 0){
+        //   AnglePID.Kp = atof(Value);
+        // }
+        // else if(strcmp(Name, "AngleKi") == 0){
+        //   AnglePID.Ki = atof(Value);
+        // }
+        // else if(strcmp(Name, "AngleKd") == 0){
+        //   AnglePID.Kd = atof(Value);
+        // }
+
+        if(strcmp(Name, "SpeedKp") == 0){
+          SpeedPID.Kp = atof(Value);
         }
-        else if(strcmp(Name, "AngleKi") == 0){
-          AnglePID.Ki = atof(Value);
+        else if(strcmp(Name, "SpeedKi") == 0){
+          SpeedPID.Ki = atof(Value);
         }
-        else if(strcmp(Name, "AngleKd") == 0){
-          AnglePID.Kd = atof(Value);
+        else if(strcmp(Name, "SpeedKd") == 0){
+          SpeedPID.Kd = atof(Value);
         }
       }
       else if(strcmp(Tag, "joystick") == 0){
@@ -208,13 +238,13 @@ int main(void)
         int8_t RH = atoi(strtok(NULL, ","));
         int8_t RV = atoi(strtok(NULL, ","));
         
-        AnglePID.Target = LV / 10;
+        SpeedPID.Target = LV / 15.0;
         DifPWM = RH / 2;
       }
       RxFlag = 0;
     }
 
-    Serial2_Printf("[plot,%f,%f]\r\n", AnglePID.Target, Angle);
+    Serial2_Printf("[plot,%f,%f]\r\n", SpeedPID.Target, AveSpeed);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -325,11 +355,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-  static uint16_t Count0;
+  static uint16_t Count0, Count1;
   if(htim->Instance == TIM1){
     Key_Tick();
-
-    TimerCount = 0;
 
     Count0++;
     if(Count0 >= 10){
@@ -364,8 +392,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
         Motor_SetPWM(2, 0);
       }
     }
+    Count1++;
+    if(Count1 >= 50){
+      Count1 = 0;
+      LeftSpeed = Encoder_Get(1) / 44.0 / 0.05 / 9.27666;
+      RightSpeed = Encoder_Get(2) / 44.0 / 0.05 / 9.27666;
 
-    TimerCount = __HAL_TIM_GET_COUNTER(&htim1);
+      AveSpeed = (LeftSpeed + RightSpeed) / 2;
+      DifSpeed = LeftSpeed - RightSpeed;
+
+      if(RunFlag){
+        SpeedPID.Actual = AveSpeed;
+        PID_Update(&SpeedPID);
+        AnglePID.Target = SpeedPID.Out;
+      }
+    }
+
   }
 }
 /* USER CODE END 4 */
