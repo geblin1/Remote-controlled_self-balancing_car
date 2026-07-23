@@ -11,8 +11,8 @@
 #include "stm32f1xx_hal_gpio.h"
 #include <stdint.h>
 #include "NRF24L01_Define.h"
-#define NRF24L01_RX_PACKET_WIDTH    4
-#define NRF24L01_TX_PACKET_WIDTH    4
+#define NRF24L01_RX_PACKET_WIDTH    32
+#define NRF24L01_TX_PACKET_WIDTH    32
 uint8_t NRF24L01_RxPacket[NRF24L01_RX_PACKET_WIDTH];
 uint8_t NRF24L01_TxAddress[5] = {0x11, 0x22, 0x33, 0x44, 0x55};
 uint8_t NRF24L01_TxPacket[NRF24L01_TX_PACKET_WIDTH];

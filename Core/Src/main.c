@@ -217,16 +217,41 @@ int main(void)
 		/*OLED更新*/
 		OLED_Update();
 
+    if(NRF24L01_Receive() == 1){
+      uint8_t ID = NRF24L01_RxPacket[0];
+      if (ID == 0x00) {
+        int8_t LH = NRF24L01_RxPacket[1];
+        int8_t LV = NRF24L01_RxPacket[2];
+        int8_t RH = NRF24L01_RxPacket[3];
+        int8_t RV = NRF24L01_RxPacket[4];
+        uint8_t KEY = NRF24L01_RxPacket[5];
+
+        SpeedPID.Target = LV / 25.0;
+        TurnPID.Target = RH / 25.0;
+
+        if (KEY == 1) {
+          if (RunFlag == 0) {
+            PID_Init(&AnglePID);
+            PID_Init(&SpeedPID);
+            PID_Init(&TurnPID);
+            RunFlag = 1;
+          } 
+          else if (RunFlag == 1) {
+            RunFlag = 0;
+          }
+        }
+      }
+    }
     if(RxFlag == 1){
       char *Tag = strtok(Rx_buffer, ",");
       if(strcmp(Tag, "key") == 0){
-        char *Name = strtok(NULL, ",");
-        char *Action = strtok(NULL, ",");
+        // char *Name = strtok(NULL, ",");
+        // char *Action = strtok(NULL, ",");
         
       }
       else if(strcmp(Tag, "slider") == 0){
-        char *Name = strtok(NULL, ",");
-        char *Value = strtok(NULL, ",");
+        // char *Name = strtok(NULL, ",");
+        // char *Value = strtok(NULL, ",");
 
         // if(strcmp(Name, "AngleKp") == 0){
         //   AnglePID.Kp = atof(Value);
@@ -259,10 +284,10 @@ int main(void)
         // }
       }
       else if(strcmp(Tag, "joystick") == 0){
-        int8_t LH = atoi(strtok(NULL, ","));
+        // int8_t LH = atoi(strtok(NULL, ","));
         int8_t LV = atoi(strtok(NULL, ","));
         int8_t RH = atoi(strtok(NULL, ","));
-        int8_t RV = atoi(strtok(NULL, ","));
+        // int8_t RV = atoi(strtok(NULL, ","));
         
         SpeedPID.Target = LV / 25.0;
         TurnPID.Target = RH / 25.0;
