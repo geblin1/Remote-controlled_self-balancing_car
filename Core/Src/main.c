@@ -18,9 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f103xb.h"
-#include "stm32f1xx_hal_tim.h"
-#include "stm32f1xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -40,6 +37,7 @@
 #include "PID.h"
 #include "Encoder.h"
 #include "Serial.h"
+#include "NRF24L01.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -164,6 +162,7 @@ int main(void)
   HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_ALL);
   HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);
   OLED_Init(); 
+  NRF24L01_Init();
   // HAL_UART_Receive_IT(&huart1, &RxData, 1);
   HAL_UART_Receive_IT(&huart2, &RxData, 1);
   /* USER CODE END 2 */
@@ -271,7 +270,7 @@ int main(void)
       RxFlag = 0;
     }
 
-    Serial2_Printf("[plot,%f,%f]\r\n", TurnPID.Target, DifSpeed);
+    // Serial2_Printf("[plot,%f,%f]\r\n", TurnPID.Target, DifSpeed);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
