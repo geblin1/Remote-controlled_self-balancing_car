@@ -219,7 +219,17 @@ int main(void)
 
     if(NRF24L01_Receive() == 1){
       uint8_t ID = NRF24L01_RxPacket[0];
-      if (ID == 0x00) {
+      if (ID == 0x00 || 0x01) {
+        if(ID == 0x01){
+          NRF24L01_TxPacket[0] = 0x02;
+          NRF24L01_TxPacket[1] = (int8_t)LeftPWM;
+          NRF24L01_TxPacket[2] = (int8_t)RightPWM;
+          *(float *)&NRF24L01_TxPacket[4] = Angle;
+          *(float *)&NRF24L01_TxPacket[8] = LeftSpeed;
+          *(float *)&NRF24L01_TxPacket[12] = RightSpeed;
+          NRF24L01_Send();
+        }
+
         int8_t LH = NRF24L01_RxPacket[1];
         int8_t LV = NRF24L01_RxPacket[2];
         int8_t RH = NRF24L01_RxPacket[3];
