@@ -58,8 +58,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t AngleFlag = 0;
-uint8_t STFlag = 0;
 
 int16_t AX, AY, AZ, GX, GY, GZ;
 uint16_t TimerCount;
@@ -218,58 +216,6 @@ int main(void)
     OLED_Printf(88, 48, OLED_6X8, "%+05.0f", TurnPID.Out);
 		/*OLED更新*/
 		OLED_Update();
-
-    if(AngleFlag == 1)
-    {
-      MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
-      /*俯仰角姿态解算*/
-      AngleAcc = -atan2(AX, AZ) / 3.14159 * 180;
-      AngleGyro = Angle + (GY - 70) / 32768.0 * 2000 * 0.01;   //70为角速度计的大致零漂值
-      float Alpha = 0.01;
-      Angle = Alpha * AngleAcc + (1 - Alpha) * AngleGyro;       //使用互补滤波进一步减小零漂影响
-  
-      if(Angle > 50 || Angle < -50){
-        RunFlag = 0;
-      }
-      if(RunFlag){
-        AnglePID.Actual = Angle;
-        // AnglePID.Target = 0;
-        PID_Update(&AnglePID);
-        AvePWM = -AnglePID.Out;
-
-        LeftPWM = AvePWM + DifPWM / 2;
-        RightPWM = AvePWM - DifPWM / 2;
-
-        if(LeftPWM > 100){LeftPWM = 100;} else if(LeftPWM < -100){LeftPWM = -100;}
-        if(RightPWM > 100){RightPWM = 100;} else if(RightPWM < -100){RightPWM = -100;}
-
-        Motor_SetPWM(1, LeftPWM);
-        Motor_SetPWM(2, RightPWM);
-      }
-      else{
-        Motor_SetPWM(1, 0);
-        Motor_SetPWM(2, 0);
-      }
-    }
-
-    if(STFlag == 1)
-    {
-      LeftSpeed = Encoder_Get(1) / 44.0 / 0.05 / 9.27666;
-      RightSpeed = Encoder_Get(2) / 44.0 / 0.05 / 9.27666;
-
-      AveSpeed = (LeftSpeed + RightSpeed) / 2;
-      DifSpeed = LeftSpeed - RightSpeed;
-
-      if(RunFlag){
-        SpeedPID.Actual = AveSpeed;
-        PID_Update(&SpeedPID);
-        AnglePID.Target = SpeedPID.Out;
-
-        TurnPID.Actual = DifSpeed;
-        PID_Update(&TurnPID);
-        DifPWM = TurnPID.Out;
-      }
-    }
 
     if(NRF24L01_Receive() == 1){
       uint8_t ID = NRF24L01_RxPacket[0];
@@ -477,56 +423,54 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
     Count0++;
     if(Count0 >= 10){
       Count0 = 0;
-      AngleFlag = 1;
-      // MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
-      // /*俯仰角姿态解算*/
-      // AngleAcc = -atan2(AX, AZ) / 3.14159 * 180;
-      // AngleGyro = Angle + (GY - 70) / 32768.0 * 2000 * 0.01;   //70为角速度计的大致零漂值
-      // float Alpha = 0.01;
-      // Angle = Alpha * AngleAcc + (1 - Alpha) * AngleGyro;       //使用互补滤波进一步减小零漂影响
+      MPU6050_GetData(&AX, &AY, &AZ, &GX, &GY, &GZ);
+      /*俯仰角姿态解算*/
+      AngleAcc = -atan2(AX, AZ) / 3.14159 * 180;
+      AngleGyro = Angle + (GY - 70) / 32768.0 * 2000 * 0.01;   //70为角速度计的大致零漂值
+      float Alpha = 0.01;
+      Angle = Alpha * AngleAcc + (1 - Alpha) * AngleGyro;       //使用互补滤波进一步减小零漂影响
   
-      // if(Angle > 50 || Angle < -50){
-      //   RunFlag = 0;
-      // }
-      // if(RunFlag){
-      //   AnglePID.Actual = Angle;
-      //   // AnglePID.Target = 0;
-      //   PID_Update(&AnglePID);
-      //   AvePWM = -AnglePID.Out;
+      if(Angle > 50 || Angle < -50){
+        RunFlag = 0;
+      }
+      if(RunFlag){
+        AnglePID.Actual = Angle;
+        // AnglePID.Target = 0;
+        PID_Update(&AnglePID);
+        AvePWM = -AnglePID.Out;
 
-      //   LeftPWM = AvePWM + DifPWM / 2;
-      //   RightPWM = AvePWM - DifPWM / 2;
+        LeftPWM = AvePWM + DifPWM / 2;
+        RightPWM = AvePWM - DifPWM / 2;
 
-      //   if(LeftPWM > 100){LeftPWM = 100;} else if(LeftPWM < -100){LeftPWM = -100;}
-      //   if(RightPWM > 100){RightPWM = 100;} else if(RightPWM < -100){RightPWM = -100;}
+        if(LeftPWM > 100){LeftPWM = 100;} else if(LeftPWM < -100){LeftPWM = -100;}
+        if(RightPWM > 100){RightPWM = 100;} else if(RightPWM < -100){RightPWM = -100;}
 
-      //   Motor_SetPWM(1, LeftPWM);
-      //   Motor_SetPWM(2, RightPWM);
-      // }
-      // else{
-      //   Motor_SetPWM(1, 0);
-      //   Motor_SetPWM(2, 0);
-      // }
+        Motor_SetPWM(1, LeftPWM);
+        Motor_SetPWM(2, RightPWM);
+      }
+      else{
+        Motor_SetPWM(1, 0);
+        Motor_SetPWM(2, 0);
+      }
     }
     Count1++;
     if(Count1 >= 50){
       Count1 = 0;
-      STFlag = 1;
-      // LeftSpeed = Encoder_Get(1) / 44.0 / 0.05 / 9.27666;
-      // RightSpeed = Encoder_Get(2) / 44.0 / 0.05 / 9.27666;
+      LeftSpeed = Encoder_Get(1) / 44.0 / 0.05 / 9.27666;
+      RightSpeed = Encoder_Get(2) / 44.0 / 0.05 / 9.27666;
 
-      // AveSpeed = (LeftSpeed + RightSpeed) / 2;
-      // DifSpeed = LeftSpeed - RightSpeed;
+      AveSpeed = (LeftSpeed + RightSpeed) / 2;
+      DifSpeed = LeftSpeed - RightSpeed;
 
-      // if(RunFlag){
-      //   SpeedPID.Actual = AveSpeed;
-      //   PID_Update(&SpeedPID);
-      //   AnglePID.Target = SpeedPID.Out;
+      if(RunFlag){
+        SpeedPID.Actual = AveSpeed;
+        PID_Update(&SpeedPID);
+        AnglePID.Target = SpeedPID.Out;
 
-      //   TurnPID.Actual = DifSpeed;
-      //   PID_Update(&TurnPID);
-      //   DifPWM = TurnPID.Out;
-      // }
+        TurnPID.Actual = DifSpeed;
+        PID_Update(&TurnPID);
+        DifPWM = TurnPID.Out;
+      }
     }
 
   }
