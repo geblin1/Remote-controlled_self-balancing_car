@@ -178,6 +178,7 @@ void NRF24L01_Init(){
 }
 void NRF24L01_Send(){
     uint8_t Status;
+    uint32_t Timeout = 100000;      /* 超时保护：模块无响应时不让任务死等 */
 
     NRF24L01_WriteRegs(NRF24L01_TX_ADDR, NRF24L01_TxAddress, 5);
     NRF24L01_WriteTxPayload(NRF24L01_TxPacket, NRF24L01_TX_PACKET_WIDTH);
@@ -185,7 +186,7 @@ void NRF24L01_Send(){
 
     NRF24L01_TxMode();
 
-    while(1){
+    while(Timeout--){
         Status = NRF24L01_ReadStatus();
         if(Status & 0x20){
             /*发送成功*/

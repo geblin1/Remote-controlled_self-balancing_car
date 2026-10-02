@@ -22,6 +22,8 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "FreeRTOS.h"
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,11 +57,13 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern TIM_HandleTypeDef htim1;
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
-/* USER CODE BEGIN EV */
+extern TIM_HandleTypeDef htim1;
 
+/* USER CODE BEGIN EV */
+/* FreeRTOS Cortex-M3 移植层的SysTick处理函数（port.c中定义，没有公开的头文件声明） */
+extern void xPortSysTickHandler( void );
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -143,15 +147,15 @@ void UsageFault_Handler(void)
 /**
   * @brief This function handles System service call via SWI instruction.
   */
-void SVC_Handler(void)
-{
-  /* USER CODE BEGIN SVCall_IRQn 0 */
+// void SVC_Handler(void)
+// {
+//   /* USER CODE BEGIN SVCall_IRQn 0 */
 
-  /* USER CODE END SVCall_IRQn 0 */
-  /* USER CODE BEGIN SVCall_IRQn 1 */
+//   /* USER CODE END SVCall_IRQn 0 */
+//   /* USER CODE BEGIN SVCall_IRQn 1 */
 
-  /* USER CODE END SVCall_IRQn 1 */
-}
+//   /* USER CODE END SVCall_IRQn 1 */
+// }
 
 /**
   * @brief This function handles Debug monitor.
@@ -169,15 +173,15 @@ void DebugMon_Handler(void)
 /**
   * @brief This function handles Pendable request for system service.
   */
-void PendSV_Handler(void)
-{
-  /* USER CODE BEGIN PendSV_IRQn 0 */
+// void PendSV_Handler(void)
+// {
+//   /* USER CODE BEGIN PendSV_IRQn 0 */
 
-  /* USER CODE END PendSV_IRQn 0 */
-  /* USER CODE BEGIN PendSV_IRQn 1 */
+//   /* USER CODE END PendSV_IRQn 0 */
+//   /* USER CODE BEGIN PendSV_IRQn 1 */
 
-  /* USER CODE END PendSV_IRQn 1 */
-}
+//   /* USER CODE END PendSV_IRQn 1 */
+// }
 
 /**
   * @brief This function handles System tick timer.
@@ -185,9 +189,17 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-
+  /* HAL时基由TIM1提供(stm32f1xx_hal_timebase_tim.c)，此处只驱动RTOS的tick */
+#if ( INCLUDE_xTaskGetSchedulerState == 1 )
+  if( xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED )
+  {
+#endif
+    xPortSysTickHandler();
+#if ( INCLUDE_xTaskGetSchedulerState == 1 )
+  }
+#endif
   /* USER CODE END SysTick_IRQn 0 */
-  HAL_IncTick();
+
   /* USER CODE BEGIN SysTick_IRQn 1 */
 
   /* USER CODE END SysTick_IRQn 1 */
